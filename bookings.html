@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Parking - Book Slots</title>
+  <style>
+    body { 
+      font-family: Arial, 
+      sans-serif; 
+      background:#f0f0f0; 
+      display:flex; 
+      justify-content:center; 
+      padding:20px; 
+    }
+    .container { 
+      background:white; 
+      padding:20px; 
+      border-radius:10px; 
+      box-shadow:0 4px 10px rgba(0,0,0,0.3); 
+      width:95%; 
+      max-width:800px; 
+    }
+    h2 { 
+      text-align:center; 
+      margin-bottom:20px; 
+    }
+    table { 
+      width:100%; 
+      border-collapse: collapse; 
+      margin-bottom:20px; 
+    }
+    th, td { 
+      padding:10px; 
+      border:1px solid #ccc; 
+      text-align:center; 
+    }
+    th { 
+      background:#4CAF50; 
+      color:white; }
+    input, select { 
+      padding:5px; 
+      width:90%; 
+    }
+    button { 
+      padding:10px 20px; 
+      background:#2196F3; 
+      color:white; 
+      border:none; 
+      border-radius:5px; 
+      cursor:pointer; 
+    }
+    button:hover { 
+      background:#0b7dda; 
+    }
+    .qr-container { 
+      margin-top:20px; 
+      text-align:center; 
+    }
+    canvas { 
+      margin:5px; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>🚗 ParkZone - Book Parking Slots 🚗</h2>
+
+    <table id="slotsTable">
+      <thead>
+        <tr>
+          <th>Slot</th>
+          <th>Vehicle Number</th>
+          <th>Date</th>
+          <th>Select</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Slots will be generated here -->
+      </tbody>
+    </table>
+
+    <button onclick="bookSlots()">Book Selected Slots</button>
+
+    <div class="qr-container" id="qrContainer">
+      <h3>Generated QR Codes</h3>
+    </div>
+  </div>
+
+  <script>
+    const slots = ["A1","A2","A3","B1","B2","B3","C1","C2","C3"];
+    const tbody = document.getElementById('slotsTable').querySelector('tbody');
+
+    // Generate table rows dynamically
+    slots.forEach(slot => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${slot}</td>
+        <td><input type="text" placeholder="Vehicle Number"></td>
+        <td><input type="date" value="${new Date().toISOString().split('T')[0]}"></td>
+        <td><input type="checkbox"></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    async function bookSlots() {
+      const rows = tbody.querySelectorAll('tr');
+      const bookingsArray = [];
+
+      rows.forEach(row => {
+        const slot = row.cells[0].innerText;
+        const vehicle = row.cells[1].querySelector('input').value.trim();
+        const date = row.cells[2].querySelector('input').value;
+        const selected = row.cells[3].querySelector('input').checked;
+
+        if (selected) {
+          if (!vehicle) {
+            alert(`Please enter vehicle number for slot ${slot}`);
+            throw "Missing vehicle number";
+          }
+          bookingsArray.push({ user: "User1", slot, vehicleNumber: vehicle, date });
+        }
+      });
+
+      if (bookingsArray.length === 0) {
+        alert("Select at least one slot to book");
+        return;
+      }
+
+      try {
+        const res = await fetch("http://localhost:4000/bookMultiple", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bookingsArray)
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("Server returned error:", text);
+          alert("Booking failed: " + text);
+          return;
+        }
+
+        const data = await res.json();
+        console.log(data);
+
+        if (data.success) {
+          alert("Booking successful!");
+          generateQRCodes(bookingsArray);
+        } else {
+          alert("Booking failed: " + data.message);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error connecting to server");
+      }
+    }
+
+    function generateQRCodes(bookings) {
+      const container = document.getElementById('qrContainer');
+      container.innerHTML = "<h3>Generated QR Codes</h3>"; // Reset
+
+      bookings.forEach(b => {
+        const canvas = document.createElement('canvas');
+        const qrData = JSON.stringify({
+          userName: b.user,
+          slot: b.slot,
+          vehicleNumber: b.vehicleNumber,
+          date: b.date
+        });
+        QRCode.toCanvas(canvas, qrData, { width: 150 }, function (error) {
+          if (error) console.error(error);
+        });
+        container.appendChild(canvas);
+      });
+    }
+  </script>
+</body>
+</html>
