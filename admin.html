@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Parking - Admin Dashboard</title>
+  <style>
+    body { 
+      font-family:Arial,sans-serif; 
+      background:url("smartparking.avif") no-repeat center center fixed; 
+      display:flex; 
+      justify-content:center; 
+      padding:20px; 
+    }
+    .container { 
+      background:rgba(255,255,255,0.95); 
+      padding:20px; 
+      border-radius:10px; 
+      box-shadow:0 4px 10px rgba(0,0,0,0.3); 
+      width:95%; 
+      max-width:1200px; 
+      text-align:center; 
+    }
+    h2,h3{
+      margin:15px 0;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-bottom:20px;
+    }
+    th,td{
+      padding:10px;
+      border:1px solid #ccc;
+      text-align:center;
+    }
+    th{
+      background:#4caf50;
+      color:white;
+    }
+    input[type=file]{
+      margin-top:10px;
+    }
+    #qr-result{
+      margin-top:10px;
+      font-weight:bold;
+    }
+    .verified { 
+      color: green; 
+      font-weight: bold; 
+    }
+    .not-verified { 
+      color: red; 
+      font-weight: bold; 
+    }
+    button.logout { 
+      float:right;
+      margin-bottom:10px;
+      background:#f44336;
+      color:white;
+      padding:10px;
+      border:none;
+      border-radius:5px; 
+      cursor:pointer; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+</head>
+<body>
+<div class="container">
+  <h2>Admin Dashboard</h2>
+  <button onclick="logout()" style="float:right;margin-bottom:10px;">Logout</button>
+
+  <h3>Registered Users</h3>
+  <table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Phone</th></tr></thead><tbody></tbody></table>
+
+  <h3>Booked Slots</h3>
+  <table id="bookingsTable"><thead><tr><th>User</th><th>Slot</th><th>Vehicle</th><th>Date</th><th>Verified</th></tr></thead><tbody></tbody></table>
+
+  <h3>QR Verification</h3>
+  <input type="file" id="qrFile" accept="image/*">
+  <div id="qr-result"></div>
+</div>
+
+<script>
+if(localStorage.getItem("username")!=="Admin") window.location.href="signin.html";
+
+async function fetchUsers(){
+  const res = await fetch("http://localhost:4000/admin/users"); const data = await res.json();
+  const tbody = document.getElementById('usersTable').querySelector('tbody'); tbody.innerHTML='';
+  data.users.forEach(u=>{
+    const row = document.createElement('tr');
+    row.innerHTML=`<td>${u.name}</td><td>${u.email}</td><td>${u.phone}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+async function fetchBookings(){
+  const res = await fetch("http://localhost:4000/admin/bookings"); const data = await res.json();
+  const tbody = document.getElementById('bookingsTable').querySelector('tbody'); tbody.innerHTML='';
+  data.bookings.forEach(b=>{
+    const row = document.createElement('tr');
+    row.innerHTML=`<td>${b.userName}</td><td>${b.slot}</td><td>${b.vehicleNumber}</td><td>${b.date}</td><td class="${b.verified?'verified':'not-verified'}">${b.verified?'Yes':'No'}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+fetchUsers(); fetchBookings();
+
+const qrFile = document.getElementById('qrFile');
+qrFile.addEventListener('change', async e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const img = new Image(); img.src=URL.createObjectURL(file);
+  img.onload = async ()=>{
+    const canvas=document.createElement('canvas'); canvas.width=img.width; canvas.height=img.height;
+    const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+    const code=jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height);
+    const resultDiv = document.getElementById('qr-result');
+    if(code){
+      const data = JSON.parse(code.data);
+      resultDiv.innerHTML=`QR Scanned! User: ${data.userName}, Slot: ${data.slot}, Vehicle: ${data.vehicleNumber}`;
+      const res = await fetch("http://localhost:4000/admin/verify",{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user:data.userName, slot:data.slot, vehicle:data.vehicleNumber})
+      });
+      const verifyResult = await res.json();
+      if(verifyResult.success){ resultDiv.innerHTML+="<br>Booking verified!"; fetchBookings(); }
+      else resultDiv.innerHTML+="<br>Booking not found!";
+    } else resultDiv.innerHTML="QR could not be read!";
+  };
+});
+
+function logout(){ localStorage.removeItem("username"); window.location.href="signin.html"; }
+</script>
+</body>
+</html>
