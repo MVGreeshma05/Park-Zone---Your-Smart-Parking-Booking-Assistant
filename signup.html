@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Parking - Sign Up</title>
+  <style>
+    body { 
+      font-family: Arial,sans-serif; 
+      background:url("smartparking.avif") no-repeat center center fixed; 
+      background-size:cover; 
+      display:flex; 
+      justify-content:center; 
+      align-items:center; 
+      height:100vh; 
+      margin:0; 
+    }
+    .container { 
+      background: rgba(255,255,255,0.9); 
+      padding:30px; 
+      border-radius:10px; 
+      box-shadow:0 4px 10px rgba(0,0,0,0.3); 
+      width:350px; 
+      text-align:center; 
+    }
+    h2 { 
+      color:#333; 
+      margin-bottom:15px; 
+    }
+    input { 
+      width:90%; 
+      padding:10px; 
+      margin:8px 0; 
+      border:1px solid #ccc; 
+      border-radius:5px; 
+    }
+    button { 
+      width:95%; 
+      padding:10px; 
+      background:#4CAF50; 
+      color:white; 
+      border:none; 
+      border-radius:5px; 
+      cursor:pointer; 
+    }
+    button:hover { 
+      background:#45a049; 
+    }
+    p { 
+      margin-top:15px; 
+    }
+    a { 
+      color:#007BFF; 
+      text-decoration:none; 
+    }
+    a:hover { 
+      text-decoration:underline; 
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🚗ParkZone - Sign Up🚗</h2>
+    <input type="text" id="name" placeholder="Full Name" required><br>
+    <input type="email" id="email" placeholder="Email" required><br>
+    <input type="text" id="phone" placeholder="Phone Number" required><br>
+    <input type="password" id="password" placeholder="Password" required><br>
+    <input type="password" id="confirmPassword" placeholder="Confirm Password" required><br>
+    <button onclick="signup()">Sign Up</button>
+    <p>Already have an account? <a href="signin.html">Sign In</a></p>
+  </div>
+
+  <script>
+    async function signup(){
+      const name=document.getElementById("name").value.trim();
+      const email=document.getElementById("email").value.trim();
+      const phone=document.getElementById("phone").value.trim();
+      const password=document.getElementById("password").value.trim();
+      const confirmPassword=document.getElementById("confirmPassword").value.trim();
+
+      if(!name||!email||!phone||!password||!confirmPassword){ alert("Fill all fields!"); return; }
+      if(password!==confirmPassword){ alert("Passwords do not match!"); return; }
+
+      try{
+        const res=await fetch("http://localhost:4000/signup",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({name,email,phone,password,confirmPassword})
+        });
+        const data=await res.json();
+        if(data.success){
+          alert("Signup successful! Redirecting...");
+          window.location.href="signin.html";
+        } else alert("Signup failed: "+data.message);
+      }catch(err){
+        console.error(err);
+        alert("Server error");
+      }
+    }
+  </script>
+</body>
+</html>
