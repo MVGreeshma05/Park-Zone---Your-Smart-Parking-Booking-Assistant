@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Parking - Book Slots</title>
+  <style>
+    body { 
+      font-family:Arial,sans-serif; 
+      background:url("smartparking.avif") no-repeat center center fixed; 
+      display:flex; 
+      justify-content:center; 
+      align-items:flex-start; 
+      padding:20px; 
+    }
+    .container { 
+      background:rgba(255,255,255,0.95); 
+      padding:30px; border-radius:10px; 
+      box-shadow:0 4px 10px rgba(0,0,0,0.3); 
+      max-width:700px; 
+      width:100%; 
+      text-align:center; 
+    }
+    h2 { 
+      margin-bottom:20px; 
+    }
+    .slots-container { 
+      display:grid; 
+      grid-template-columns:repeat(5,80px); 
+      gap:15px; 
+      justify-content:center; 
+      margin-bottom:20px; 
+    }
+    .slot { 
+      width:80px;
+      height:80px;
+      border-radius:10px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      font-weight:bold;
+      color:white;
+      font-size:16px;
+      cursor:pointer;
+      transition:0.2s; 
+    }
+    .slot.free { 
+      background-color:#4caf50; 
+    }
+    .slot.booked { 
+      background-color:#f44336; 
+      cursor:not-allowed; 
+    }
+    .slot.selected { 
+      background-color:#2196f3; 
+    }
+    input { 
+      padding:10px;
+      width:60%; 
+      margin-bottom:15px; 
+      border-radius:5px; 
+      border:1px solid #ccc; 
+    }
+    button { 
+      padding:10px 20px; 
+      background:#2196f3; 
+      color:white; 
+      border:none; 
+      border-radius:5px; 
+      cursor:pointer; 
+    }
+    button:hover { 
+      background:#0b7dda; 
+    }
+    #vehicleContainer { 
+      margin-bottom:20px; 
+    }
+    #qr-container { 
+      margin-top:20px; 
+      display:flex; 
+      flex-wrap:wrap; 
+      gap:10px; 
+      justify-content:center; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>Book Your Parking Slot</h2>
+    <div class="slots-container" id="slotsContainer"></div>
+    <div id="vehicleContainer"></div>
+    <button onclick="confirmBooking()">Confirm Booking</button>
+    <div id="qr-container"></div>
+    <button style="margin-top:20px;background:#f44336;" onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    // redirect if not logged in
+    if(!localStorage.getItem('username')){
+      alert("Please sign in first!");
+      window.location.href = "signin.html";
+    }
+
+    const totalSlots = 25;
+    let bookedSlots = []; 
+    let selectedSlots = [];
+    const slotsContainer = document.getElementById('slotsContainer');
+    const vehicleContainer = document.getElementById('vehicleContainer');
+
+    // create slots
+    for(let i=1;i<=totalSlots;i++){
+      const div=document.createElement('div'); div.classList.add('slot'); div.textContent='S'+i;
+      if(bookedSlots.includes('S'+i)) div.classList.add('booked');
+      else { div.classList.add('free'); div.addEventListener('click',()=>toggleSelect(div)); }
+      slotsContainer.appendChild(div);
+    }
+
+    function toggleSelect(div){
+      const s = div.textContent;
+      if(selectedSlots.includes(s)){
+        selectedSlots = selectedSlots.filter(x=>x!==s);
+        div.classList.remove('selected'); div.classList.add('free');
+      } else {
+        selectedSlots.push(s);
+        div.classList.remove('free'); div.classList.add('selected');
+      }
+      renderVehicleInputs();
+    }
+
+    function renderVehicleInputs(){
+      vehicleContainer.innerHTML='';
+      selectedSlots.forEach(s=>{
+        const input = document.createElement('input');
+        input.type='text';
+        input.placeholder=`Vehicle number for ${s}`;
+        input.id=`vehicle_${s}`;
+        vehicleContainer.appendChild(input);
+        vehicleContainer.appendChild(document.createElement('br'));
+      });
+    }
+
+    async function confirmBooking(){
+      if(selectedSlots.length===0){ alert('Select at least one slot'); return; }
+      const vehicles = selectedSlots.map(s=>{
+        const v = document.getElementById(`vehicle_${s}`).value.trim();
+        if(!v) throw `Enter vehicle number for ${s}`;
+        return v;
+      });
+
+      try{
+        const bookingData = selectedSlots.map((s,i)=>({
+          slot: s,
+          vehicleNumber: vehicles[i],
+          userName: localStorage.getItem('username'), // actual logged-in user
+          date: new Date().toLocaleString()
+        }));
+
+        const res = await fetch("http://localhost:4000/bookMultiple",{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(bookingData)
+        });
+
+        const result = await res.json();
+        if(result.success){
+          alert('Booking successful! QR codes generated.');
+          selectedSlots.forEach((s,i)=>{
+            const slotDiv = Array.from(slotsContainer.children).find(d=>d.textContent===s);
+            slotDiv.classList.remove('selected','free'); slotDiv.classList.add('booked');
+            generateQR(bookingData[i]);
+          });
+          selectedSlots=[]; vehicleContainer.innerHTML='';
+        } else alert('Booking failed: '+result.message);
+      } catch(err){ alert(err); }
+    }
+
+    function generateQR(data){
+      const qrContainer = document.getElementById('qr-container');
+      const canvas = document.createElement('canvas');
+      qrContainer.appendChild(canvas);
+      QRCode.toCanvas(canvas, JSON.stringify(data), {width:150}, err=>{ if(err) console.error(err); });
+    }
+
+    function logout(){
+      localStorage.removeItem('username');
+      window.location.href = "signin.html";
+    }
+  </script>
+</body>
+</html>
